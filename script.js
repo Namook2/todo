@@ -10,6 +10,13 @@ const GOOGLE_MAPS_API_KEY = 'AIzaSyB2kEOJz4CjRUei3Y2W2szZEjlySG0OX8o';
 // localStorage에 데이터를 저장할 때 쓰는 키 모음.
 // 기본 메뉴(할 일/갈 곳/먹을 것)는 각각 고정된 키를 쓰고,
 // 사용자가 추가한 커스텀 메뉴는 getAllMenus()에서 `todoapp_custom_${메뉴id}` 형태로 별도 키를 만들어 씁니다.
+//
+// [중요] localStorage는 파일 내용이 아니라 "접속 주소(origin: 프로토콜+도메인)"를 기준으로
+// 브라우저에 저장됩니다. 즉 index.html/script.js/style.css를 수정해서 깃허브에 다시
+// 올리고 같은 주소로 접속해도, 이 키들 아래에 저장된 사용자 데이터는 자동으로 그대로
+// 남아있습니다(따로 초기화하는 코드도 없음). 데이터가 사라지는 유일한 경우는 아래
+// 문자열 키 이름 자체를 바꾸거나 지우는 것이므로, 앞으로 이 키 이름들은 절대 바꾸지 마세요.
+// (항목 구조를 바꿔야 한다면 키 이름은 유지한 채 불러온 뒤 변환하는 방식으로 처리해야 함)
 const STORAGE_KEYS = {
   menus: 'todoapp_customMenus',      // 사용자가 추가한 커스텀 메뉴 목록(이름/유형)
   todos: 'todoapp_todos',            // 기본 '할 일' 메뉴의 날짜별 항목
@@ -564,6 +571,8 @@ function saveCustomMenus(menus) {
 
 // 기본 메뉴 3개 + 커스텀 메뉴를 합친 전체 메뉴 배열을 반환.
 // 커스텀 메뉴는 각자 고유한 storageKey(`todoapp_custom_${id}`)를 여기서 부여받음.
+// [중요] 이 'todoapp_custom_' 접두어도 STORAGE_KEYS와 마찬가지로 절대 바꾸지 말 것 -
+// 바꾸면 이미 저장된 커스텀 메뉴들의 항목 데이터를 더 이상 찾지 못해 사라진 것처럼 보이게 됨.
 function getAllMenus() {
   const custom = loadCustomMenus().map(m => ({ ...m, storageKey: `todoapp_custom_${m.id}` }));
   return [...DEFAULT_MENUS, ...custom];
