@@ -110,6 +110,10 @@ body {
   border-top: 1px solid var(--color-border);
   box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
   display: flex;
+  /* 아이폰 등 하단 홈 인디케이터가 있는 기기에서, 네비 버튼이 그 인디케이터 영역과
+     겹치지 않도록 안쪽에 여백을 추가로 확보함 (지원하지 않는 브라우저는 0으로 처리) */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
 }
 
 .app-main {
@@ -118,8 +122,10 @@ body {
   min-height: 100vh;
   margin: 0 auto;
   background: var(--color-bg);
-  /* 상/하단 고정 헤더·네비에 콘텐츠가 가려지지 않도록 그만큼 안쪽 여백을 줌 */
-  padding: calc(var(--header-h) + 16px) 16px calc(var(--nav-h) + 24px);
+  /* 상/하단 고정 헤더·네비에 콘텐츠가 가려지지 않도록 그만큼 안쪽 여백을 줌.
+     하단은 네비 높이(+홈 인디케이터 안전영역) 만큼 비우고, 그 위에 추가로 여유 공간을
+     더 둬서 스크롤을 끝까지 내렸을 때 마지막 항목이 네비 바로 위에서 넉넉히 보이게 함 */
+  padding: calc(var(--header-h) + 16px) 16px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 40px);
   box-shadow: 0 0 24px rgba(0,0,0,0.06);
 }
 
@@ -515,6 +521,8 @@ body {
 .add-row input[type="text"],
 .add-row input[type="url"] {
   flex: 1;
+  min-width: 0; /* flex 아이템의 기본 최소너비(auto)를 없애 입력창이 화면 폭에 맞춰 줄어들 수 있게 함 -
+                   이게 없으면 좁은 화면에서 입력창이 밀려나며 옆의 '추가' 버튼이 찌그러져 글자가 줄바뀜됨 */
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 11px 12px;
@@ -522,6 +530,7 @@ body {
   background: var(--color-surface);
 }
 .add-row input:focus { outline: 2px solid var(--color-primary); outline-offset: -1px; }
+.add-row .btn { flex: none; white-space: nowrap; } /* '추가' 버튼은 항상 원래 크기를 유지하고 줄바꿈되지 않도록 고정 */
 
 /* 앱 전체에서 재사용하는 기본 버튼 스타일 */
 .btn {
@@ -547,7 +556,11 @@ body {
 
 .item-list { /* 할 일/핀/음식 등 모든 목록의 공통 컨테이너 */
   list-style: none;
-  margin: 0;
+  /* 위: 바로 위 입력창/검색창과 첫 항목 사이 간격을 20px로 띄움 (이전 형제 요소의
+     margin-bottom과 겹치는 만큼은 상쇄되어 최종 간격은 둘 중 더 큰 값인 20px가 됨)
+     아래: 마지막 항목 밑으로 여유 공간을 추가로 둬서 스크롤해도 하단 네비게이션과
+     맞닿지 않고 넉넉하게 보이도록 함 (app-main의 하단 padding과는 별개로 추가 확보) */
+  margin: 20px 0 24px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -637,6 +650,7 @@ body {
 }
 .map-toolbar input {
   flex: 1;
+  min-width: 0; /* 좁은 화면에서 입력창이 옆의 돋보기 버튼 자리를 침범하지 않도록 함 */
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 10px 12px;
