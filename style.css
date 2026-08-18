@@ -429,9 +429,9 @@ body {
 .view-title.has-clock { margin-bottom: 6px; } /* 바로 아래에 시계가 붙는 '할 일' 화면은 제목과의 간격을 좁힘 */
 
 /* '할 일' 화면 제목만 두 줄로 나눠 표시: 1줄 = 메뉴 이름("할 일"), 2줄 = 날짜.
-   메뉴 이름 쪽을 날짜보다 2px 더 크고 한 단계 더 굵게(800) 강조함 */
+   메뉴 이름 쪽을 날짜보다 크고 한 단계 더 굵게(800) 강조하고, 날짜 줄은 기본보다 1px 작게 표시함 */
 .view-title-name { font-size: calc(1.1875rem + 2px); font-weight: 800; }
-.view-title-date { display: block; }
+.view-title-date { display: block; font-size: calc(1.1875rem - 1px); }
 
 .view-clock { /* '할 일' 화면 제목 아래의 실시간 시계 */
   display: inline-flex;

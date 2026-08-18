@@ -344,6 +344,14 @@ function formatDisplayDate(iso) {
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
 }
 
+// '할 일' 화면 달력 아래 날짜 줄 전용 포맷. 요일을 "화"가 아니라 "화요일"처럼
+// 전체 이름으로 표시하기 위해 weekday를 'long'으로 지정함(다른 화면의 formatDisplayDate는 그대로 둠).
+function formatDisplayDateFull(iso) {
+  const d = parseISO(iso);
+  const locale = appSettings.language === 'en' ? 'en-US' : 'ko-KR';
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+}
+
 // 할 일/핀/음식/메뉴 등 새 항목에 붙이는 간단한 고유 id 생성기.
 // 현재 시각(36진수) + 임의 문자열을 합쳐서 충돌 가능성을 낮춤. (서버 없는 로컬 앱이라 이 정도로 충분)
 function uid() {
@@ -732,8 +740,9 @@ function renderTextView(main, menu) {
   title.className = 'view-title';
   if (menu.id === 'todo') {
     // '할 일' 화면은 달력 바로 아래 제목을 "할 일" / 날짜 두 줄로 나눠서 표시.
-    // 메뉴 이름("할 일") 쪽은 view-title-name 클래스로 더 크고 굵게 강조함.
-    title.innerHTML = `<span class="view-title-name">${escapeHtml(name)}</span><br><span class="view-title-date">${escapeHtml('· ' + formatDisplayDate(selectedDate))}</span>`;
+    // 메뉴 이름("할 일") 쪽은 view-title-name 클래스로 더 크고 굵게 강조하고,
+    // 날짜 줄은 앞에 특수문자 없이, 요일도 "화요일"처럼 전체 이름으로 보여줌(formatDisplayDateFull).
+    title.innerHTML = `<span class="view-title-name">${escapeHtml(name)}</span><br><span class="view-title-date">${escapeHtml(formatDisplayDateFull(selectedDate))}</span>`;
   } else {
     title.textContent = `${name} · ${formatDisplayDate(selectedDate)}`;
   }
