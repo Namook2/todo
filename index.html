@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Namuke to do List</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ============================================================
+       상단 헤더 (항상 화면 최상단에 고정 - style.css의 .app-header)
+       구성: [설정 톱니바퀴] - [로고, 가운데 정렬] - [날짜 + 달력 팝업]
+       ============================================================ -->
+  <header class="app-header">
+    <div class="header-inner">
+
+      <!-- 좌측 상단 설정 버튼: 클릭 시 script.js의 openSettingsModal() 호출 -->
+      <button id="settingsBtn" class="settings-btn" type="button" title="설정" aria-label="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V8a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z">
+          </path>
+        </svg>
+      </button>
+
+      <!-- 상단 중앙 로고: 클릭 시 script.js init()에서 activeMenuId를 null로 초기화 -> 홈 화면으로 이동 -->
+      <!-- 이미지 파일은 logo1.png(=Logo1.png, Windows는 대소문자 구분 안 함)를 이 폴더에 함께 두어야 함 -->
+      <button id="logoBtn" class="logo-btn" title="처음 화면으로">
+        <img src="Logo1.png" alt="로고" class="logo-img">
+      </button>
+
+      <!-- 우측 상단 날짜 표시 + 달력 -->
+      <div class="date-display" id="dateDisplay">
+        <!-- 현재 선택된 날짜(script.js의 selectedDate)를 표시. 클릭하면 아래 calendarPopup을 토글 -->
+        <button id="dateBtn" class="date-btn" type="button">
+          <span id="dateText">-</span>
+          <span class="date-caret">▾</span>
+        </button>
+
+        <!-- 실시간 시계: 날짜 선택 버튼 바로 아래에 표시. script.js의 renderClock()이 매초 갱신 (주석 처리로 비활성화됨) -->
+        <!-- <span id="headerClock" class="header-clock">--:--:--</span> -->
+
+        <!-- 달력 팝업: 기본은 hidden 속성으로 숨김. script.js의 buildCalendar()가 내용을 그려 채움 -->
+        <div class="calendar-popup" id="calendarPopup" hidden>
+          <div class="calendar-head">
+            <button id="calPrev" type="button" class="cal-nav-btn">‹</button>
+            <span id="calMonthLabel"></span>
+            <button id="calNext" type="button" class="cal-nav-btn">›</button>
+          </div>
+          <!-- 요일 헤더(일~토)는 언어 설정에 따라 renderWeekdayHeaders()가 JS로 채워 넣음 -->
+          <div class="calendar-weekdays" id="calendarWeekdays"></div>
+          <!-- 날짜 칸들은 buildCalendar()가 매달 새로 그려 넣음 -->
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <button id="calTodayBtn" type="button" class="cal-today-btn">오늘로 이동</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       메인 콘텐츠 영역
+       현재 선택된 메뉴(할 일 / 갈 곳 / 먹을 것 / 사용자 추가 메뉴 / 홈)에 따라
+       script.js의 renderMain() 함수가 내용을 통째로 새로 그려 넣는 빈 컨테이너입니다.
+       ============================================================ -->
+  <main class="app-main" id="appMain">
+    <!-- 화면 내용이 여기 동적으로 렌더링됩니다 -->
+  </main>
+
+  <!-- ============================================================
+       하단 고정 네비게이션 바
+       기본 메뉴(할 일/갈 곳/먹을 것) + 사용자가 추가한 메뉴(최대 5개) + [+] 버튼을
+       script.js의 renderNav() 함수가 매번 새로 그려 넣습니다.
+       ============================================================ -->
+  <nav class="bottom-nav" id="bottomNav">
+    <!-- 하단 메뉴 버튼이 여기 동적으로 렌더링됩니다 -->
+  </nav>
+
+  <!-- ============================================================
+       공용 모달(팝업창) 틀
+       할 일/장소/음식 추가 폼, 설정 창 등 앱의 모든 팝업이 이 하나의 틀을 재사용합니다.
+       평소에는 hidden 속성으로 숨겨져 있다가, script.js의 showModal()이 호출되면
+       #modalBox 안에 내용을 채우고 hidden을 해제해 화면에 표시합니다.
+       (주의: style.css 상단의 [hidden]{display:none!important} 규칙이 있어야
+        hidden 속성이 항상 우선 적용되어 평소에 완전히 숨겨집니다.)
+       ============================================================ -->
+  <div class="modal-overlay" id="modalOverlay" hidden>
+    <div class="modal" id="modalBox" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <!-- Google Maps API 키는 config.js(로컬 전용 파일, git에는 올라가지 않음)에서 정의합니다.
+       config.js가 없다면 config.example.js를 복사해서 만들어주세요. -->
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>

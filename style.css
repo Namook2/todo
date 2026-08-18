@@ -1,0 +1,964 @@
+/* ==========================================================================
+   기본/변수
+
+   여기 정의된 --color-*, --page-bg 값은 "기본값(라이트 모드)"입니다.
+   실제로는 script.js의 applyTheme() 함수가 사용자가 설정에서 고른 테마(라이트/
+   다크/컬러 설정)에 맞춰 이 CSS 변수들을 자바스크립트로 덮어씁니다. 그래서 아래
+   에 있는 .todo-item, .btn 등 모든 스타일은 색을 직접 쓰지 않고 반드시
+   var(--color-xxx) 형태로만 참조합니다 → 테마를 바꾸면 새로고침 없이 앱 전체
+   색이 즉시 바뀝니다.
+   ========================================================================== */
+:root {
+  --max-width: 480px;  /* 앱 전체 폭 (PC에서도 이 폭만큼만 가운데 정렬되어 모바일 앱처럼 보임) */
+  --header-h: 96px;    /* 상단 헤더 높이 (로고 크기와 맞춰 조절) */
+  --nav-h: 64px;       /* 하단 네비게이션 높이 */
+
+  /* 라이트 모드 기본 팔레트 (다크/컬러 설정일 때는 JS가 아래 값을 실시간으로 교체함) */
+  --page-bg: #e9eaee;       /* 앱 프레임 바깥쪽(브라우저 배경) 색 */
+  --color-bg: #f4f5f7;      /* 입력창, 비활성 버튼 등의 은은한 배경색 */
+  --color-surface: #ffffff; /* 카드, 리스트 아이템, 모달 등의 표면색 */
+  --color-border: #e3e5e9;  /* 테두리색 */
+  --color-text: #202124;    /* 기본 글자색 */
+  --color-text-sub: #767a82;/* 보조/설명 글자색 */
+  --color-primary: #4a6cf7; /* 포인트(강조) 색 - 버튼, 선택 상태, 진행바 등 */
+  --color-primary-dark: #3757d8; /* 포인트 색의 hover(눌렀을 때) 색 */
+  --color-danger: #e5484d;  /* 삭제 등 위험한 동작에 쓰는 색 */
+  --color-done: #b7bcc4;    /* 완료 처리된 항목의 흐린 글자색 */
+
+  /* 폰트 종류/굵기도 설정 화면에서 바꿀 수 있도록 변수로 분리 (applyFontSettings()가 값 교체) */
+  --user-font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+  --user-font-weight: 400;
+}
+
+/* [중요] hidden 속성은 항상 최우선으로 요소를 완전히 숨깁니다.
+   .modal-overlay 처럼 display:flex 같은 다른 규칙이 있는 요소라도, HTML의
+   hidden 속성이 붙어있으면 무조건 안 보이게 강제합니다. 이 규칙이 없으면
+   모달이 hidden 상태에서도 화면을 덮어 클릭을 가로채는 버그가 생깁니다. */
+[hidden] { display: none !important; }
+
+* { box-sizing: border-box; }
+
+/* 폰트 크기 설정(작게/보통/크게/아주 크게)의 기준이 되는 루트 크기.
+   script.js의 applyFontSettings()가 이 값을 14~20px 사이로 바꿉니다.
+   아래 모든 font-size는 px가 아닌 rem으로 되어 있어서, 이 값 하나만 바뀌어도
+   앱 전체 글자 크기가 비율대로 함께 커지고 작아집니다. */
+html {
+  font-size: 18px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--page-bg);
+  color: var(--color-text);
+  font-family: var(--user-font-family);
+  font-weight: var(--user-font-weight);
+  -webkit-tap-highlight-color: transparent; /* 모바일에서 탭할 때 생기는 파란 하이라이트 제거 */
+}
+
+body { font-size: 1rem; }
+
+button {
+  font-family: inherit;
+  font-weight: inherit; /* 브라우저 기본값 대신 위에서 설정한 폰트 굵기를 버튼도 그대로 사용 */
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: 0.9375rem;
+}
+
+img { max-width: 100%; }
+
+/* ==========================================================================
+   레이아웃 : 가운데 정렬된 앱 프레임 (PC / 모바일 공통)
+
+   핵심 아이디어: 헤더/네비는 position:fixed + left:50% + translateX(-50%)로
+   "뷰포트 정가운데"에 고정하고, 폭은 --max-width(480px)로 제한합니다.
+   그래서 큰 PC 화면에서도 앱이 휴대폰 앱처럼 화면 중앙에 좁게 표시되고,
+   좁은 모바일 화면에서는 화면 꽉 차게 자연스럽게 늘어납니다.
+   ========================================================================== */
+body {
+  display: flex;
+  justify-content: center;
+}
+
+.app-header,
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--max-width);
+  background: var(--color-surface);
+  z-index: 100;
+}
+
+.app-header {
+  top: 0;
+  height: var(--header-h);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.bottom-nav {
+  bottom: 0;
+  height: var(--nav-h);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+  display: flex;
+}
+
+.app-main {
+  width: 100%;
+  max-width: var(--max-width);
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--color-bg);
+  /* 상/하단 고정 헤더·네비에 콘텐츠가 가려지지 않도록 그만큼 안쪽 여백을 줌 */
+  padding: calc(var(--header-h) + 16px) 16px calc(var(--nav-h) + 24px);
+  box-shadow: 0 0 24px rgba(0,0,0,0.06);
+}
+
+/* PC처럼 넓은 화면에서는 앱 프레임 좌우에 얇은 테두리를 그려 경계를 표시 */
+@media (min-width: 520px) {
+  .app-header, .bottom-nav, .app-main {
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+  }
+}
+
+/* ==========================================================================
+   헤더 : 설정 + 로고 + 날짜
+   레이아웃: 톱니바퀴(좌측 절대배치) - 로고(가운데 flex 정렬) - 날짜(우측 절대배치)
+   ========================================================================== */
+.header-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 로고를 항상 정가운데로 */
+  position: relative;      /* 톱니바퀴/날짜 버튼의 absolute 기준점 */
+  padding: 0 12px;
+}
+
+/* 좌측 상단 설정(톱니바퀴) 버튼 */
+.settings-btn {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+}
+/* color-mix()로 hover 배경을 만들면 라이트/다크/컬러 테마가 바뀌어도
+   하드코딩한 색 없이 현재 테마 색을 기준으로 자연스럽게 살짝 어두워짐 */
+.settings-btn:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
+.settings-btn svg { width: 20px; height: 20px; }
+
+/* 상단 중앙 로고 버튼 (클릭 시 홈 화면으로 이동) */
+.logo-btn {
+  border: none;
+  background: none;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.logo-btn:hover { background: color-mix(in srgb, var(--color-bg) 70%, var(--color-text) 8%); }
+.logo-img { height: 68px; object-fit: contain; display: block; } /* 로고 실제 표시 크기 (요청에 따라 2배 확대됨) */
+
+/* 우측 상단 날짜 버튼 + 그 아래 펼쳐지는 달력 팝업의 위치 기준 컨테이너 */
+.date-display {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+/* 날짜 버튼 바로 아래에 표시되는 실시간 시계 */
+.header-clock {
+  font-size: 0.6875rem;
+  color: var(--color-text-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.date-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 20px;
+  padding: 7px 12px;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.date-btn:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
+.date-caret { font-size: 0.625rem; color: var(--color-text-sub); }
+
+/* 날짜 버튼 클릭 시 펼쳐지는 달력 팝업 (평소엔 index.html의 hidden 속성으로 숨겨짐) */
+.calendar-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  padding: 12px;
+  z-index: 200;
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 이전달(‹) - 연월 라벨 - 다음달(›) */
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.cal-nav-btn {
+  border: none;
+  background: none;
+  font-size: 1.125rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--color-text);
+}
+.cal-nav-btn:hover { background: var(--color-bg); }
+
+/* 일/월/화/수/목/금/토 요일 헤더 (7칸 그리드). 실제 글자는 script.js의
+   renderWeekdayHeaders()가 언어 설정에 맞춰 채워 넣음 */
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.6875rem;
+  color: var(--color-text-sub);
+  margin-bottom: 4px;
+}
+
+/* 날짜 칸 7열 그리드. 칸 자체(button.cal-day)는 script.js의 buildCalendar()가 매달 새로 그림 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-day {
+  border: none;
+  background: none;
+  padding: 6px 0;
+  font-size: 0.8125rem;
+  border-radius: 8px;
+  color: var(--color-text);
+}
+.cal-day:hover { background: var(--color-bg); }
+.cal-day.is-empty { visibility: hidden; }              /* 그 달 1일이 시작되기 전 빈 칸 */
+.cal-day.is-today { font-weight: 700; color: var(--color-primary); } /* 오늘 날짜 강조 */
+.cal-day.is-selected { background: var(--color-primary); color: #fff; } /* 현재 보고 있는 날짜 */
+/* 해당 날짜에 저장된 할 일 기록이 있으면 아래에 작은 점을 표시 (collectDatesWithData 참고) */
+.cal-day.has-data::after {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  margin: 2px auto 0;
+}
+.cal-day.is-selected.has-data::after { background: #fff; } /* 선택된 칸 위에서는 점도 흰색으로 */
+
+.cal-today-btn {
+  width: 100%;
+  margin-top: 10px;
+  border: none;
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+}
+.cal-today-btn:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
+
+/* ==========================================================================
+   하단 네비게이션
+   할 일 / 갈 곳 / 먹을 것 + 사용자가 추가한 메뉴(최대 5개) + [+] 버튼.
+   버튼 개수가 많아져도 잘리지 않도록 overflow-x:auto로 가로 스크롤 허용.
+   ========================================================================== */
+.bottom-nav {
+  align-items: stretch;
+  overflow-x: auto;
+}
+
+.nav-btn {
+  flex: 1 0 auto;
+  min-width: 60px;
+  border: none;
+  background: none;
+  color: var(--color-text-sub);
+  font-size: 0.78125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border-top: 2px solid transparent; /* 선택 안 됐을 때도 자리를 차지해서, 선택 시 레이아웃이 흔들리지 않게 */
+  white-space: nowrap;
+}
+.nav-btn:hover { background: var(--color-bg); }
+.nav-btn.active {
+  color: var(--color-primary);
+  border-top-color: var(--color-primary); /* 현재 선택된 메뉴는 위쪽에 포인트색 밑줄(윗줄) 표시 */
+  font-weight: 700;
+}
+.nav-btn.nav-add { /* 맨 끝 [+] 메뉴 추가 버튼 */
+  flex: 0 0 52px;
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--color-primary);
+}
+
+/* ==========================================================================
+   공통 카드/섹션 - 여러 화면에서 공통으로 재사용하는 기본 블록들
+   ========================================================================== */
+.view-title { /* 각 메뉴 화면 맨 위 제목 (예: "할 일 · 2026년 8월 13일") */
+  font-size: 1.1875rem;
+  font-weight: 700;
+  margin: 4px 0 14px;
+}
+.view-title.has-clock { margin-bottom: 6px; } /* 바로 아래에 시계가 붙는 '할 일' 화면은 제목과의 간격을 좁힘 */
+
+.view-clock { /* '할 일' 화면 제목 아래의 실시간 시계 */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  color: var(--color-text-sub);
+  font-variant-numeric: tabular-nums; /* 초가 바뀔 때 숫자 폭이 흔들리지 않도록 */
+  margin: 0 0 14px;
+}
+.view-clock svg { width: 14px; height: 14px; flex: none; }
+
+.card {
+  background: var(--color-surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.empty-hint { /* "아직 등록된 항목이 없어요" 같은 빈 상태 안내문구 */
+  color: var(--color-text-sub);
+  font-size: 0.84375rem;
+  text-align: center;
+  padding: 28px 8px;
+}
+
+/* ==========================================================================
+   홈 화면 (로고를 누르면 돌아오는 첫 화면)
+   ========================================================================== */
+.home-hero {
+  text-align: center;
+  padding: 28px 8px 8px;
+}
+.home-hero h1 {
+  font-size: 1.375rem;
+  margin: 10px 0 6px;
+}
+.home-hero p {
+  color: var(--color-text-sub);
+  font-size: 0.84375rem;
+  line-height: 1.6;
+  margin: 0;
+}
+/* 오늘의 할 일 / 기록한 장소 / 먹을 것 목록 요약 3칸 */
+.home-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.home-summary-item { /* 클릭하면 해당 메뉴로 바로 이동하는 버튼 (renderHomeView 참고) */
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 14px 8px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: none;
+  color: var(--color-text);
+}
+.home-summary-item:hover { background: color-mix(in srgb, var(--color-surface) 85%, var(--color-text) 6%); }
+.home-summary-num {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.home-summary-label {
+  font-size: 0.71875rem;
+  color: var(--color-text-sub);
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   텍스트형 화면 (할 일 목록 및 이와 같은 방식의 사용자 추가 메뉴)
+   renderTextView() 함수가 이 클래스들을 사용해 항목을 그립니다.
+   ========================================================================== */
+.add-row { /* 항목 입력창 + 추가 버튼 한 줄 */
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.add-row input[type="text"],
+.add-row input[type="url"] {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 0.90625rem;
+  background: var(--color-surface);
+}
+.add-row input:focus { outline: 2px solid var(--color-primary); outline-offset: -1px; }
+
+/* 앱 전체에서 재사용하는 기본 버튼 스타일 */
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--color-primary);
+  color: #fff;
+}
+.btn:hover { background: var(--color-primary-dark); }
+.btn.btn-secondary { /* 보조 버튼 (취소, 나중에 하기 등) */
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+.btn.btn-secondary:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
+.btn.btn-danger { background: var(--color-danger); } /* 삭제 버튼 */
+.btn.btn-danger:hover { background: #c93a3e; }
+.btn.btn-block { width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.item-list { /* 할 일/핀/음식 등 모든 목록의 공통 컨테이너 */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-item { /* 할 일 한 줄: [완료 체크] [내용] [삭제] */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 12px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.todo-check { /* 동그란 완료 체크 버튼 */
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 0.8125rem;
+}
+.todo-check.done { /* 완료 상태일 때: 포인트색으로 채워지고 체크(✓) 표시 */
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.todo-text {
+  flex: 1;
+  font-size: 0.90625rem;
+  word-break: break-all;
+}
+.todo-text.done { /* 완료된 항목은 흐리게 + 취소선 */
+  color: var(--color-done);
+  text-decoration: line-through;
+}
+
+.icon-btn { /* 삭제(✕) 같은 작은 아이콘형 버튼 */
+  border: none;
+  background: none;
+  color: var(--color-text-sub);
+  font-size: 0.9375rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex: none;
+}
+.icon-btn:hover { background: var(--color-bg); color: var(--color-danger); } /* hover 시 삭제 색으로 경고 */
+
+/* 오늘 완료율을 보여주는 진행 막대 (할 일이 1개 이상일 때만 표시) */
+.progress-bar-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--color-border);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.25s ease; /* 완료 개수가 바뀔 때 막대가 부드럽게 늘어나도록 */
+}
+.progress-label {
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+  margin: -8px 0 14px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   위치형 화면 (갈 곳 / 지도 기반 사용자 추가 메뉴)
+   renderLocationView(), initMap() 함수 참고
+   ========================================================================== */
+.map-toolbar { /* 장소 검색창 + 돋보기 버튼 + 자동완성 드롭다운(.search-suggestions)의 위치 기준 */
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.map-toolbar input {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.map-search-btn { /* 검색창 옆 돋보기 버튼 - 누르면 입력한 검색어로 지도 이동 */
+  flex: none;
+  width: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-search-btn:hover { background: var(--color-primary-dark); }
+.map-search-btn svg { width: 18px; height: 18px; }
+
+/* 검색창에 타이핑할 때 입력창 바로 밑에 뜨는 자동완성 후보 목록 */
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  overflow: hidden;
+  z-index: 60;
+}
+.search-suggestion-item {
+  display: block;
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: none;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.search-suggestion-item:first-child { border-top: none; }
+.search-suggestion-item:hover { background: var(--color-bg); }
+.search-suggestion-item.is-info { /* 결과 없음 / 오류 안내용 - 클릭 불가능한 항목 */
+  color: var(--color-text-sub);
+  cursor: default;
+}
+.search-suggestion-item.is-info:hover { background: none; }
+
+.map-container { /* 실제 구글 지도가 그려지는 박스 (내부 div에 지도가 삽입됨) */
+  width: 100%;
+  height: 300px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-surface);
+  margin-bottom: 14px;
+  border: 1px solid var(--color-border);
+}
+
+/* Google Maps API 키가 없거나 로드에 실패했을 때 지도 대신 보여주는 안내문 */
+.map-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  color: var(--color-text-sub);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+.map-placeholder code {
+  background: var(--color-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* 지도 바로 아래에 표시하는 작은 사용법 안내 ("지도의 장소를 누르면...") */
+.map-hint {
+  font-size: 0.71875rem;
+  color: var(--color-text-sub);
+  text-align: center;
+  margin: -6px 0 14px;
+}
+
+.pin-list-title { /* "기록한 핀 목록" 소제목 */
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  margin: 4px 0 8px;
+}
+
+.pin-chip { /* 지도 아래 저장된 핀 목록의 한 줄 (누르면 메모/수정 모달이 열림) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 11px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  width: 100%;
+  border: none;
+  text-align: left;
+  color: var(--color-text);
+}
+.pin-chip:hover { background: color-mix(in srgb, var(--color-surface) 85%, var(--color-text) 6%); }
+.pin-chip .pin-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--color-primary);
+  flex: none;
+}
+.pin-chip .pin-info { flex: 1; min-width: 0; }
+.pin-chip .pin-name { font-size: 0.875rem; font-weight: 600; }
+.pin-chip .pin-sub { /* 주소 또는 좌표. 한 줄을 넘으면 "..." 으로 잘림 */
+  font-size: 0.71875rem;
+  color: var(--color-text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   이미지형 화면 (먹을 것 / 이미지 기반 사용자 추가 메뉴)
+   renderImageView() 함수 참고
+   ========================================================================== */
+.food-item { /* 목록의 한 줄: [썸네일] [이름] [완료 체크] [삭제] */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.food-thumb { /* 저장된 이미지가 있을 때의 작은 미리보기 */
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+.food-thumb-placeholder { /* 아직 이미지가 없을 때 대신 보여주는 아이콘 박스 */
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  flex: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  color: var(--color-text-sub);
+}
+.food-name-btn { /* 이름 클릭 시 큰 이미지 보기 모달이 열림 (openFoodDetailModal) */
+  flex: 1;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.90625rem;
+  padding: 0;
+  color: var(--color-text);
+  min-width: 0;
+}
+.food-name-btn.done { color: var(--color-done); text-decoration: line-through; }
+
+/* ==========================================================================
+   모달(팝업창) 공통 스타일
+   할 일 추가, 핀 메모, 음식 이미지 선택, 설정 등 모든 팝업이 이 스타일을 공유합니다.
+   showModal()/closeModal() 함수가 #modalOverlay, #modalBox를 제어합니다.
+   ========================================================================== */
+.modal-overlay { /* 화면 전체를 덮는 반투명 배경 */
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 24, 0.5);
+  display: flex;
+  align-items: flex-end; /* 모바일: 화면 아래에서 올라오는 바텀시트 형태 */
+  justify-content: center;
+  z-index: 500;
+  padding: 0;
+}
+@media (min-width: 520px) {
+  .modal-overlay { align-items: center; } /* PC처럼 넓은 화면에서는 화면 중앙에 표시 */
+}
+
+.modal { /* 실제 팝업 박스. 내용이 길면 자체적으로 스크롤됨 */
+  width: 100%;
+  max-width: var(--max-width);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-radius: 18px 18px 0 0; /* 아래에서 올라오는 형태라 위쪽 모서리만 둥글게 */
+  padding: 20px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.2);
+  position: relative; /* 우측 상단 닫기(✕) 버튼의 absolute 기준점 */
+}
+@media (min-width: 520px) {
+  .modal { border-radius: 16px; } /* 화면 중앙에 뜰 때는 네 모서리 모두 둥글게 */
+}
+
+.modal h2 {
+  font-size: 1.0625rem;
+  margin: 0 0 16px;
+}
+
+/* 모달 안의 입력 필드 한 묶음 (라벨 + 입력창) */
+.field-group { margin-bottom: 14px; }
+.field-group label {
+  display: block;
+  font-size: 0.78125rem;
+  color: var(--color-text-sub);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.field-group input[type="text"],
+.field-group input[type="url"],
+.field-group select,
+.field-group textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.90625rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.field-group textarea { resize: vertical; min-height: 70px; }
+.field-group input[type="color"] { /* 설정 > 컬러 설정에서 쓰는 색상 선택기 */
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 4px;
+  background: var(--color-bg);
+}
+
+/* [+] 메뉴 추가 모달의 "텍스트형/위치형/이미지형" 선택 라디오 버튼 */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.radio-option input { margin-top: 3px; }
+.radio-option .radio-title { font-size: 0.875rem; font-weight: 600; }
+.radio-option .radio-desc { font-size: 0.75rem; color: var(--color-text-sub); margin-top: 2px; }
+
+/* 설정 화면의 언어(한국어/English), 테마(라이트/다크/컬러) 선택용 버튼 그룹 */
+.toggle-group {
+  display: flex;
+  gap: 8px;
+}
+.toggle-btn {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-radius: 10px;
+  padding: 10px 6px;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+.toggle-btn:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
+.toggle-btn.active { /* 현재 선택된 옵션 (openSettingsModal의 syncToggleActive가 클래스 부여) */
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.menu-choice-btn { /* [+] 눌렀을 때 "새 메뉴 추가"/"메뉴 관리" 선택 버튼 */
+  width: 100%;
+  background: var(--color-surface);
+  text-align: left;
+}
+.menu-choice-btn:hover { background: var(--color-bg); }
+
+.menu-manage-item { /* 메뉴 관리 목록 한 줄: [이름 입력] [삭제] */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 8px 8px 8px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.menu-manage-name {
+  flex: 1;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--color-text);
+  font-size: 0.90625rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.menu-manage-name:hover { border-color: var(--color-border); }
+.menu-manage-name:focus { border-color: var(--color-primary); }
+
+.modal-actions { /* 모달 하단의 취소/저장, 삭제/저장 같은 버튼 줄 */
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.modal-actions .btn { flex: 1; }
+
+.modal-close-x { /* 모달 우측 상단 ✕ 닫기 버튼 (showModal에서 자동으로 추가됨) */
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 1.125rem;
+  color: var(--color-text-sub);
+}
+
+.modal-sub { /* 모달 안의 작은 설명 문구 */
+  font-size: 0.78125rem;
+  color: var(--color-text-sub);
+  line-height: 1.6;
+  margin: -6px 0 14px;
+}
+
+/* "또는" 같은 구분선 문구를 텍스트 좌우로 가로선과 함께 표시 */
+.modal-divider {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+  margin: 4px 0 14px;
+  position: relative;
+}
+.modal-divider::before,
+.modal-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--color-border);
+}
+.modal-divider::before { left: 0; }
+.modal-divider::after { right: 0; }
+
+/* 음식 이미지 추가 모달의 "여기를 누르고 Ctrl+V로 붙여넣기" 영역
+   (openImagePickModal에서 tabindex를 주어 포커스 가능하게 만들고, paste 이벤트를 받음) */
+.paste-zone {
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-sub);
+  background: var(--color-bg);
+  margin-bottom: 10px;
+  cursor: text;
+}
+.paste-zone:focus { /* 포커스(붙여넣기 가능 상태)를 시각적으로 표시 */
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+/* 이미지 선택/붙여넣기 결과 미리보기 박스 */
+.image-preview-box {
+  width: 100%;
+  height: 160px;
+  border-radius: 12px;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 14px;
+  font-size: 0.78125rem;
+  color: var(--color-text-sub);
+  text-align: center;
+  padding: 8px;
+}
+.image-preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lightbox-img { /* 먹을 것 이름을 눌렀을 때 크게 보여주는 이미지 (openFoodDetailModal) */
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.menu-limit-note { /* [+] 메뉴 추가 모달 하단의 "현재 n/5개 사용 중" 문구 */
+  font-size: 0.75rem;
+  color: var(--color-text-sub);
+  text-align: center;
+  margin-top: 10px;
+}
