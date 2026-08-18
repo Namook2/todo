@@ -301,6 +301,87 @@ body {
 .cal-today-btn:hover { background: color-mix(in srgb, var(--color-bg) 80%, var(--color-text) 10%); }
 
 /* ==========================================================================
+   메인 화면 내장 달력 ('할 일' 화면 전용)
+   상단 헤더의 날짜 선택 팝업 대신, '할 일' 화면 맨 위에 항상 펼쳐서 보여주는 달력 카드.
+   script.js의 renderMainCalendar()가 내용을 그리며, 날짜 칸을 누르면 그 날짜의
+   할 일 목록이 바로 아래에 표시됨.
+   ========================================================================== */
+.main-calendar { /* 달력 전체를 감싸는 카드 */
+  background: var(--color-surface);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.main-calendar-head { /* 이전달(‹) - 연월 라벨 - 다음달(›) */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+/* 날짜 칸 7열 그리드. 칸 하나하나(button.main-cal-day)는 renderMainCalendar()가 매달 새로 그림 */
+.main-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.main-cal-day { /* 날짜 칸 하나: 숫자 + (있다면) 항목 개수만큼의 점 */
+  border: none;
+  background: none;
+  border-radius: 10px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 6px 0 5px;
+  min-height: 44px;
+  font-size: 0.8125rem;
+  overflow: hidden; /* 점이 많아져도 칸 밖으로 튀어나오지 않도록 잘라냄 */
+}
+.main-cal-day:hover { background: var(--color-bg); }
+.main-cal-day.is-empty { visibility: hidden; } /* 그 달 1일이 시작되기 전 빈 칸 */
+.main-cal-day.is-today .main-cal-day-num { font-weight: 700; color: var(--color-primary); } /* 오늘 날짜 강조 */
+.main-cal-day.is-selected { background: var(--color-primary); color: #fff; } /* 현재 선택된(목록에 표시 중인) 날짜 */
+/* 오늘 날짜를 눌러서 선택했을 때: 배경과 숫자 색이 둘 다 포인트색이라 숫자가 안 보이던 문제를 막기 위해,
+   이 경우에만 숫자 색을 흰색으로 덮어씀 (오늘 날짜의 기본 강조색 자체는 위 규칙에서 그대로 유지) */
+.main-cal-day.is-today.is-selected .main-cal-day-num { color: #fff; }
+
+/* 날짜 숫자 아래에, 그 날짜에 저장된 할 일 개수만큼 찍히는 작은 점들 */
+.main-cal-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 6px;
+  max-width: 100%;
+}
+.main-cal-dot { /* 점 하나 = 할 일 항목 하나 */
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex: none;
+}
+.main-cal-dot-more { /* 점으로 다 표시하기엔 항목이 너무 많을 때 마지막 자리에 대신 표시하는 줄임표 */
+  font-size: 0.5625rem;
+  line-height: 1;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+/* 선택된 칸 위에서는 점/줄임표도 흰색으로 (배경이 포인트색으로 채워지므로).
+   줄임표(…)는 배경이 아니라 글자색만 흰색으로 바꿔야 함 - background까지 흰색을 주면
+   글자(흰색)가 흰 배경 위에 겹쳐 안 보이면서 작은 흰 네모 박스처럼 보이는 문제가 있었음 */
+.main-cal-day.is-selected .main-cal-dot { background: #fff; }
+.main-cal-day.is-selected .main-cal-dot-more { color: #fff; }
+
+/* ==========================================================================
    하단 네비게이션
    할 일 / 갈 곳 / 먹을 것 + 사용자가 추가한 메뉴(최대 5개) + [+] 버튼.
    버튼 개수가 많아져도 잘리지 않도록 overflow-x:auto로 가로 스크롤 허용.
@@ -346,6 +427,11 @@ body {
   margin: 4px 0 14px;
 }
 .view-title.has-clock { margin-bottom: 6px; } /* 바로 아래에 시계가 붙는 '할 일' 화면은 제목과의 간격을 좁힘 */
+
+/* '할 일' 화면 제목만 두 줄로 나눠 표시: 1줄 = 메뉴 이름("할 일"), 2줄 = 날짜.
+   메뉴 이름 쪽을 날짜보다 2px 더 크고 한 단계 더 굵게(800) 강조함 */
+.view-title-name { font-size: calc(1.1875rem + 2px); font-weight: 800; }
+.view-title-date { display: block; }
 
 .view-clock { /* '할 일' 화면 제목 아래의 실시간 시계 */
   display: inline-flex;

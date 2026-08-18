@@ -34,7 +34,9 @@
         <img src="Logo1.png" alt="로고" class="logo-img">
       </button>
 
-      <!-- 우측 상단 날짜 표시 + 달력 -->
+      <!-- 우측 상단 날짜 표시 + 달력
+           기본 '할 일' 메뉴는 메인 화면 안에 자체 달력이 항상 펼쳐져 있으므로 이 팝업은 숨겨지고,
+           사용자가 추가한 텍스트형 커스텀 메뉴에서만 보여짐 (script.js의 setDateDisplayVisible 참고) -->
       <div class="date-display" id="dateDisplay">
         <!-- 현재 선택된 날짜(script.js의 selectedDate)를 표시. 클릭하면 아래 calendarPopup을 토글 -->
         <button id="dateBtn" class="date-btn" type="button">

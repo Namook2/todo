@@ -305,6 +305,8 @@ let activeMenuId = null;   // null = 홈 화면
 let selectedDate = todayISO(); // 현재 화면에 표시 중인 날짜(YYYY-MM-DD). 상단 날짜/달력으로 변경됨
 let calendarViewYear = 0;  // 달력 팝업이 현재 보여주고 있는 연도 (openCalendar/buildCalendar에서 관리)
 let calendarViewMonth = 0; // 0-11
+let mainCalYear = 0;  // '할 일' 화면에 항상 펼쳐져 있는 메인 달력이 보여주고 있는 연도 (renderMainCalendar에서 관리)
+let mainCalMonth = 0; // 0-11
 let liveClockIntervalId = null; // '할 일' 화면의 실시간 시계용 setInterval id. renderMain()이 다시 그릴 때마다 정리됨
 let googleMapsLoadPromise = null; // Google Maps 스크립트를 중복 로드하지 않도록 캐시해두는 Promise (loadGoogleMaps 참고)
 const mapInstances = {};   // menuId -> { map, markers:{}, nearbyMarkers:[] }
@@ -637,9 +639,11 @@ function renderMain() {
     return;
   }
 
-  // 날짜(달력) 선택창은 날짜별로 항목을 관리하는 'text' 타입 메뉴(할 일 등)에서만 보여줌.
+  // 날짜(달력) 선택창은 날짜별로 항목을 관리하는 'text' 타입 메뉴 중, 기본 '할 일' 메뉴를
+  // 제외한 나머지(사용자 추가 텍스트 메뉴)에서만 보여줌. '할 일' 화면은 메인 화면 안에
+  // 자체 달력(renderMainCalendar)이 항상 펼쳐져 있으므로 상단 오른쪽 날짜 선택은 숨김.
   // 홈 화면 / '갈 곳'(location) / '먹을 것'(image)은 날짜 개념이 없는 화면이라 숨김.
-  setDateDisplayVisible(menu.type === 'text');
+  setDateDisplayVisible(menu.type === 'text' && menu.id !== 'todo');
 
   if (menu.type === 'text') renderTextView(main, menu);
   else if (menu.type === 'location') renderLocationView(main, menu);
@@ -718,9 +722,21 @@ function renderTextView(main, menu) {
   const doneCount = items.filter(i => i.done).length;
   const percent = items.length ? Math.round((doneCount / items.length) * 100) : 0;
 
+  // 기본 '할 일' 메뉴에서만: 날짜 텍스트/시계보다 먼저 실제 달력을 그려서
+  // 연/월/일 단위로 날짜를 넘겨보고, 그 날짜를 눌러 바로 할 일을 관리할 수 있게 함.
+  if (menu.id === 'todo') {
+    renderMainCalendar(main, menu);
+  }
+
   const title = document.createElement('div');
   title.className = 'view-title';
-  title.textContent = `${name} · ${formatDisplayDate(selectedDate)}`;
+  if (menu.id === 'todo') {
+    // '할 일' 화면은 달력 바로 아래 제목을 "할 일" / 날짜 두 줄로 나눠서 표시.
+    // 메뉴 이름("할 일") 쪽은 view-title-name 클래스로 더 크고 굵게 강조함.
+    title.innerHTML = `<span class="view-title-name">${escapeHtml(name)}</span><br><span class="view-title-date">${escapeHtml('· ' + formatDisplayDate(selectedDate))}</span>`;
+  } else {
+    title.textContent = `${name} · ${formatDisplayDate(selectedDate)}`;
+  }
   main.appendChild(title);
 
   // 기본 '할 일' 메뉴에서만: 날짜 텍스트 아래에 실시간으로 갱신되는 시계를 표시.
@@ -831,6 +847,134 @@ function makeEmptyHint(text) {
   div.className = 'empty-hint';
   div.textContent = text;
   return div;
+}
+
+/* ==========================================================================
+   메인 화면 내장 달력 ('할 일' 화면 전용)
+   상단 헤더의 날짜 선택 팝업 대신, '할 일' 화면 맨 위에 항상 펼쳐서 보여주는 실제 달력.
+   ========================================================================== */
+
+// 지정한 텍스트형 메뉴(여기서는 '할 일')의 저장 데이터에서 날짜별 항목 개수를 Map으로 모아 반환.
+// renderMainCalendar()가 각 날짜 칸에 표시할 점(dot) 개수를 정하는 데 사용.
+function collectItemCounts(menu) {
+  const data = loadTextData(menu);
+  const counts = new Map();
+  Object.keys(data).forEach(dateKey => {
+    const list = data[dateKey];
+    if (list && list.length) counts.set(dateKey, list.length);
+  });
+  return counts;
+}
+
+// '할 일' 화면 맨 위에 실제로 조작 가능한 달력을 그림.
+// 이전달/다음달 버튼으로 연/월을 이동하고(연도는 12월↔1월 경계를 넘을 때 자동으로 함께 바뀜),
+// 날짜 칸을 누르면 selectedDate가 그 날짜로 바뀌면서 화면 전체가 다시 그려져
+// 아래쪽 목록에 그 날짜의 할 일이 표시됨. 각 칸에는 그 날짜에 저장된 항목 개수만큼
+// 작은 점을 찍어 어떤 날짜에 기록이 있는지 한눈에 보여주고, 칸에 다 못 담을 만큼 많으면
+// 줄임표(…)로 대신 표시함.
+function renderMainCalendar(main, menu) {
+  // 처음 이 화면에 들어올 때는 현재 선택된 날짜(selectedDate)가 속한 연/월로 시작
+  if (!mainCalYear) {
+    const base = parseISO(selectedDate);
+    mainCalYear = base.getFullYear();
+    mainCalMonth = base.getMonth();
+  }
+
+  // 달력 전체를 감싸는 카드(월 이동 버튼 + 요일 헤더 + 날짜 그리드 + 오늘로 이동 버튼)
+  const wrap = document.createElement('div');
+  wrap.className = 'main-calendar';
+  wrap.innerHTML = `
+    <div class="main-calendar-head">
+      <button type="button" class="cal-nav-btn" id="mainCalPrev">‹</button>
+      <span id="mainCalMonthLabel"></span>
+      <button type="button" class="cal-nav-btn" id="mainCalNext">›</button>
+    </div>
+    <div class="calendar-weekdays" id="mainCalWeekdays"></div>
+    <div class="main-calendar-grid" id="mainCalGrid"></div>
+    <button type="button" class="cal-today-btn" id="mainCalTodayBtn">${escapeHtml(t('calToday'))}</button>
+  `;
+  main.appendChild(wrap);
+
+  // 요일 헤더(일~토 / Sun~Sat)를 현재 언어 설정에 맞춰 채움 (상단 헤더 달력과 같은 방식)
+  const weekdays = appSettings.language === 'en'
+    ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    : ['일', '월', '화', '수', '목', '금', '토'];
+  document.getElementById('mainCalWeekdays').innerHTML = weekdays.map(d => `<span>${d}</span>`).join('');
+
+  // 달력의 월 라벨 + 날짜 그리드만 새로 그리는 내부 함수.
+  // 이전달/다음달 버튼을 누를 때마다 화면 전체(renderMain)를 다시 그리지 않고 이 부분만
+  // 갱신해서, 같이 떠 있는 실시간 시계 등 다른 요소가 깜빡이거나 끊기지 않게 함.
+  function renderGrid() {
+    const label = document.getElementById('mainCalMonthLabel');
+    const locale = appSettings.language === 'en' ? 'en-US' : 'ko-KR';
+    label.textContent = new Date(mainCalYear, mainCalMonth, 1).toLocaleDateString(locale, { year: 'numeric', month: 'long' });
+
+    const grid = document.getElementById('mainCalGrid');
+    grid.innerHTML = '';
+
+    const firstDay = new Date(mainCalYear, mainCalMonth, 1).getDay();
+    const lastDate = new Date(mainCalYear, mainCalMonth + 1, 0).getDate();
+    const today = todayISO();
+    const counts = collectItemCounts(menu);
+    const maxDots = 4; // 한 칸에 표시할 점의 최대 개수 (이보다 항목이 많으면 줄임표로 표시)
+
+    // 1일이 시작되는 요일 앞까지는 빈 칸으로 채워 요일 정렬을 맞춤
+    for (let i = 0; i < firstDay; i++) {
+      const span = document.createElement('span');
+      span.className = 'main-cal-day is-empty';
+      grid.appendChild(span);
+    }
+
+    for (let day = 1; day <= lastDate; day++) {
+      const iso = isoOf(mainCalYear, mainCalMonth, day);
+      const count = counts.get(iso) || 0;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'main-cal-day';
+      if (iso === today) btn.classList.add('is-today');
+      if (iso === selectedDate) btn.classList.add('is-selected');
+
+      // 항목 개수만큼 점을 표시하되, maxDots를 넘으면 마지막 자리를 줄임표(…)로 대체
+      let dotsHtml = '';
+      if (count > 0) {
+        const dotCount = count > maxDots ? maxDots - 1 : count;
+        dotsHtml = '<span class="main-cal-dots">'
+          + '<span class="main-cal-dot"></span>'.repeat(dotCount)
+          + (count > maxDots ? '<span class="main-cal-dot-more">…</span>' : '')
+          + '</span>';
+      }
+      btn.innerHTML = `<span class="main-cal-day-num">${day}</span>${dotsHtml}`;
+
+      // 날짜 칸 클릭: 그 날짜를 선택 날짜로 바꾸고 화면 전체를 다시 그려
+      // 아래쪽 목록에 그 날짜의 할 일이 뜨도록 함
+      btn.addEventListener('click', () => {
+        selectedDate = iso;
+        renderMain();
+      });
+      grid.appendChild(btn);
+    }
+  }
+  renderGrid();
+
+  document.getElementById('mainCalPrev').addEventListener('click', () => {
+    mainCalMonth--;
+    if (mainCalMonth < 0) { mainCalMonth = 11; mainCalYear--; }
+    renderGrid();
+  });
+  document.getElementById('mainCalNext').addEventListener('click', () => {
+    mainCalMonth++;
+    if (mainCalMonth > 11) { mainCalMonth = 0; mainCalYear++; }
+    renderGrid();
+  });
+  // '오늘로 이동' 버튼: 선택 날짜와 달력이 보여주는 연/월을 모두 오늘 기준으로 되돌림
+  document.getElementById('mainCalTodayBtn').addEventListener('click', () => {
+    selectedDate = todayISO();
+    const base = parseISO(selectedDate);
+    mainCalYear = base.getFullYear();
+    mainCalMonth = base.getMonth();
+    renderMain();
+  });
 }
 
 /* ==========================================================================
